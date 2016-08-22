@@ -15,6 +15,7 @@ const argv = require('yargs')
       .showHelpOnFail(true)
       .argv;
 const portscanner = require('portscanner');
+const term = require( 'terminal-kit' ).terminal ;
 
 // Looking for SSH ports
 let pOrig = argv.pOrig,
@@ -30,7 +31,7 @@ function command(sentence, msg) {
         if (err) {
           reject(err)
         }
-        console.log(msg || stdout);
+        term.cyan(msg || stdout);
         resolve();
       });
     } catch(e) {
@@ -49,43 +50,46 @@ function commands(list) {
 
 // linux commands to be executed
 async function execute() {
+  const origTimeLbl = '    Tiempo empleado';
   try {
     // First, we get channel list and picons from the origin decoder
-    console.log(`\nTe informo de lo que vamos haciendo:`);
-    console.log(`\n -- Obteniendo los archivos necesarios de ${argv.orig}:${pOrig}`);
+    console.time(origTimeLbl);
+    term.bold(`\n -- Obteniendo los archivos necesarios de `).bgBlue(`${argv.orig}:${pOrig}\n`);
     await commands([
       [
         `ssh -p ${pOrig} root@${argv.orig} "tar cf - /etc/enigma2" | tar xvf -`,
-        `  - Obtenida configuración de la lista de canales -> ./etc/enigma2`
+        `  - Obtenida configuración de la lista de canales -> ./etc/enigma2\n`
       ],
       [
         `ssh -p ${pOrig} root@${argv.orig} "cd /hdd && tar cf - picon" | bzip2 - > ${icons}`,
-        `  - Obtenidos iconos de los canales -> ./${icons}`
+        `  - Obtenidos iconos de los canales -> ./${icons}\n`
       ]
     ]);
+    console.timeEnd(origTimeLbl);
+
     // Then, we send them to the destination decoder
-    console.log(`\n -- Subiendo los archivos a ${argv.dest}:${pDest} (canales e iconos)`);
+    term.bold(`\n -- Subiendo los archivos a `).bgMagenta(`${argv.dest}:${pDest}`)(` (canales e iconos)\n`);
     await commands([
       [
         `scp -P ${pDest} \`find etc/ | egrep 'lamedb|list|bouquet|satellites'\` root@${argv.dest}:/etc/enigma2/`,
-        `  - Subida la configuración de los canales`
+        `  - Subida la configuración de los canales\n`
       ],
       [
         `scp -P ${pDest} -r ./${icons} root@${argv.dest}:`,
-        `  - Subidos los iconos actualizados (extrayendo en remoto... esto tardará un pelín)`
+        `  - Subidos los iconos actualizados (extrayendo en remoto... esto tardará un pelín)\n`
       ]
     ]);
     // And it extracts picon file
     await command(
       `ssh -p ${pDest} root@${argv.dest} "tar xjf ${icons} -C /usr/share/enigma2/ && rm -rf ${icons}"`,
-      `  - Extraídos ya todos los ficheros de los iconos de los canales`
+      `  - Extraídos ya todos los ficheros de los iconos de los canales\n`
     );
     // Finally, we remove the temporal dirs
     await command(
       `rm -rf ./etc ./${icons}`,
-      ` 3º Borrados todos ficheros temporales`
+      `\n -- Borrados todos ficheros temporales`
     );
-    console.log("\n¡Proceso finalizado correctamente!\n");
+    term.bgGreen.bold("\n¡Proceso finalizado correctamente!\n");
   }
   catch(err) {
     console.log(`${err}`);
@@ -98,7 +102,7 @@ function checkHost(ip, port) {
       portscanner.checkPortStatus(port, ip, function(error, status) {
         if (error) reject(error);
         if (status === 'open') resolve()
-        else reject(`Host ${ip}:${port} no responde. No puedo continuar.\n`);
+        else reject(`\nHost ${ip}:${port} no responde. No puedo continuar.\n`);
       });
     } catch(e) {
       reject(e);
