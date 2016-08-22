@@ -1,0 +1,16 @@
+{
+  "name": "dec-update",
+  "version": "1.0.0",
+  "description": "It updates target deco using the origin deco files",
+  "main": "dec-update.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Ricardo Díaz",
+  "license": "ISC",
+  "dependencies": {
+    "babel": "^6.5.2",
+    "babel-plugin-transform-async-to-generator": "^6.8.0",
+    "portscanner": "^1.0.0"
+  }
+}
