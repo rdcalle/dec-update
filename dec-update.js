@@ -51,17 +51,18 @@ function commands(list) {
 // linux commands to be executed
 async function execute() {
   const origTimeLbl = '    Tiempo empleado';
+  const noCkech = '-oStrictHostKeyChecking=no'; // to avoid check different host dynIP
   try {
     // First, we get channel list and picons from the origin decoder
     console.time(origTimeLbl);
     term.bold(`\n -- Obteniendo los archivos necesarios de `).bgBlue(`${argv.orig}:${pOrig}\n`);
     await commands([
       [
-        `ssh -p ${pOrig} root@${argv.orig} "tar cf - /etc/enigma2" | tar xvf -`,
+        `ssh ${noCkech} -p ${pOrig} root@${argv.orig} "tar cf - /etc/enigma2" | tar xvf -`,
         `  - Obtenida configuración de la lista de canales -> ./etc/enigma2\n`
       ],
       [
-        `ssh -p ${pOrig} root@${argv.orig} "cd /hdd && tar cf - picon" | bzip2 - > ${icons}`,
+        `ssh ${noCkech} -p ${pOrig} root@${argv.orig} "cd /hdd && tar cf - picon" | bzip2 - > ${icons}`,
         `  - Obtenidos iconos de los canales -> ./${icons}\n`
       ]
     ]);
@@ -71,17 +72,17 @@ async function execute() {
     term.bold(`\n -- Subiendo los archivos a `).bgMagenta(`${argv.dest}:${pDest}`)(` (canales e iconos)\n`);
     await commands([
       [
-        `scp -P ${pDest} \`find etc/ | egrep 'lamedb|list|bouquet|satellites'\` root@${argv.dest}:/etc/enigma2/`,
+        `scp ${noCkech} -P ${pDest} \`find etc/ | egrep 'lamedb|list|bouquet|satellites'\` root@${argv.dest}:/etc/enigma2/`,
         `  - Subida la configuración de los canales\n`
       ],
       [
-        `scp -P ${pDest} -r ./${icons} root@${argv.dest}:`,
+        `scp ${noCkech} -P ${pDest} -r ./${icons} root@${argv.dest}:`,
         `  - Subidos los iconos actualizados (extrayendo en remoto... esto tardará un pelín)\n`
       ]
     ]);
     // And it extracts picon file
     await command(
-      `ssh -p ${pDest} root@${argv.dest} "tar xjf ${icons} -C /usr/share/enigma2/ && rm -rf ${icons}"`,
+      `ssh ${noCkech} -p ${pDest} root@${argv.dest} "tar xjf ${icons} -C /usr/share/enigma2/ && rm -rf ${icons}"`,
       `  - Extraídos ya todos los ficheros de los iconos de los canales\n`
     );
     // Finally, we remove the temporal dirs
