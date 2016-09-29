@@ -3,14 +3,14 @@
 
 // declarations
 const icons = "picon.tar.bz2",
-      ipOrig = "192.168.1.204",
-      ipDest = "192.168.1.222";
+      origDefault = "192.168.1.204:22",
+      destDefault = "192.168.1.222:22";
 
 // import required libraries
 const exec = require('child_process').exec;
 const argv = require('yargs')
-      .usage('Uso: $0 --orig [ip] --pOrig [num] --dest [ip] --pDest [num]')
-      .default({'orig': ipOrig, 'dest': ipDest})
+      .usage('Uso: $0 --orig [ip]:[puerto] --dest [ip]:[puerto]')
+      .default({'orig': origDefault, 'dest': destDefault})
       .demand(['orig', 'dest'])
       .showHelpOnFail(true)
       .argv;
@@ -23,11 +23,11 @@ const clear = require('clear')
       Line = CLI.Line,
       LineBuffer = CLI.LineBuffer;
 
-// Looking for SSH ports
-let pOrig = argv.pOrig,
-    pDest = argv.pDest;
-if (!pOrig) { pOrig = ipOrig === argv.orig ? 22 : 6922 }
-if (!pDest) { pDest = ipDest === argv.dest ? 22 : 6922}
+// Looking for SSH ports and host isolation
+const [ hostOrig, pOrig ] = argv.orig.split(':'),
+      [ hostDest, pDest ] = argv.dest.split(':');
+let orig = { host: hostOrig, port: pOrig }
+let dest = { host: hostDest, port: pDest }
 
 // Execute a shell linux command and return its result wrapped in a Promise
 function command(sentence, msg) {
@@ -104,13 +104,13 @@ async function execute() {
   }
 }
 
-function checkHost(ip, port) {
+function checkHost({host, port}) {
   return new Promise((resolve, reject) => {
     try {
-      portscanner.checkPortStatus(port, ip, function(error, status) {
+      portscanner.checkPortStatus(port, host, function(error, status) {
         if (error) reject(error);
         if (status === 'open') resolve()
-        else reject(`\nHost ${ip}:${port} no responde. No puedo continuar.\n`);
+        else reject(`\nHost ${host}:${port} no responde. No puedo continuar.\n`);
       });
     } catch(e) {
       reject(e);
@@ -122,25 +122,29 @@ function main() {
   // Clears screen and welcome message
   clear();
   term.blue(figlet.textSync('DEC-UPDATE', { horizontalLayout: 'full' }));
-  draw();
+  draw(orig, dest);
 
   Promise.all([
-    checkHost(argv.orig, pOrig),
-    checkHost(argv.dest, pDest)
+    checkHost(orig),
+    checkHost(dest)
   ])
-  .then(() => execute())
+  .then(() => {
+    orig.state = 'UP';
+    draw(orig, dest)
+  })
+  // .then(() => execute())
   .catch((err) => {
     console.log(err);
     return false;
   });
 }
 
-function draw() {
+function draw(orig, dest) {
   const COLOR = { YES: 'green', UP: 'green', NO: 'red', DOWN: 'red'};
   const {origin, targets} = {
     origin: {
-      host: '123.23.123.54:6922',
-      state: 'DOWN',
+      host: `${orig.host}:${orig.port}`,
+      state: orig.state || 'DOWN',
       channels: 'YES',
       icons: 'NO'
     },
