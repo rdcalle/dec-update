@@ -24,10 +24,27 @@ const clear = require('clear')
       LineBuffer = CLI.LineBuffer;
 
 // Looking for SSH ports and host isolation
-const [ hostOrig, pOrig ] = argv.orig.split(':'),
-      [ hostDest, pDest ] = argv.dest.split(':');
-let orig = { host: hostOrig, port: pOrig }
-let dest = { host: hostDest, port: pDest }
+const [ hostOrig, pOrig ] = argv.orig.split(':');
+let orig = { host: hostOrig, port: pOrig || '22' }
+let dest = setDest(argv.dest); // Every destination host into an array
+// console.log(argv.dest, dest);
+// process.exit();
+// [ hostDest, pDest ] = argv.dest.split(':');
+// let dest = { host: hostDest, port: pDest || '22' }
+
+// Set an array with the destination target
+function setDest(dest) {
+  let target = Array.isArray(dest) ? dest : dest.split(" ");
+
+  return target
+    .map(host => {
+      if ( /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(host) ) {
+        const [ ip, port ] = host.split(':');
+        return { host: ip, port: port || '22' }
+      }
+    })
+    .filter(host => host);
+}
 
 // Execute a shell linux command and return its result wrapped in a Promise
 function command(sentence, msg) {
@@ -109,8 +126,7 @@ function checkHost({host, port}) {
     try {
       portscanner.checkPortStatus(port, host, function(error, status) {
         if (error) reject(error);
-        if (status === 'open') resolve()
-        else reject(`\nHost ${host}:${port} no responde. No puedo continuar.\n`);
+        status === 'open' ? resolve() : reject()
       });
     } catch(e) {
       reject(e);
@@ -124,19 +140,25 @@ function main() {
   term.blue(figlet.textSync('DEC-UPDATE', { horizontalLayout: 'full' }));
   draw(orig, dest);
 
-  Promise.all([
-    checkHost(orig),
-    checkHost(dest)
-  ])
-  .then(() => {
-    orig.state = 'UP';
-    draw(orig, dest)
-  })
+  checkHost(orig).then(state => {
+    orig.state = state;
+    // draw(orig, dest)
+  }),
+  dest
+    .map(host => {
+      checkHost(host)
+        .then(() => 'UP')
+        .catch(() => 'DOWN')
+        .then((state) => {
+          host.state = state;
+          console.log(host) ;
+        });
+    });
   // .then(() => execute())
-  .catch((err) => {
-    console.log(err);
-    return false;
-  });
+  // .catch((err) => {
+  //   console.log(err);
+  //   return false;
+  // });
 }
 
 function draw(orig, dest) {
