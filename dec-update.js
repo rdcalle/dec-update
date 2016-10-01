@@ -1,10 +1,15 @@
 #!/usr/bin/env babel-node
 'use stric'
 
-// declarations
-const icons = "picon.tar.bz2",
+// global declarations
+const icons       = "picon.tar.bz2",
       origDefault = "192.168.1.204:22",
       destDefault = "192.168.1.222:22";
+const DOWN  = ['DOWN', 'red'],
+      NO    = ['NO', 'red'],
+      UP    = ['UP', 'green'],
+      YES   = ['YES', 'green'];
+
 
 // import required libraries
 const exec = require('child_process').exec;
@@ -14,25 +19,17 @@ const argv = require('yargs')
       .demand(['orig', 'dest'])
       .showHelpOnFail(true)
       .argv;
-const term = require( 'terminal-kit' ).terminal;
+const term        = require( 'terminal-kit' ).terminal;
 const portscanner = require('portscanner');
-const clear = require('clear')
-      figlet = require('figlet')
-      CLI = require('clui'),
-      clc = require('cli-color'),
-      Line = CLI.Line,
-      LineBuffer = CLI.LineBuffer;
+const clear       = require('clear')
+      figlet      = require('figlet')
+      CLI         = require('clui'),
+      clc         = require('cli-color'),
+      Line        = CLI.Line,
+      LineBuffer  = CLI.LineBuffer;
 
-// Looking for SSH ports and host isolation
-const [ hostOrig, pOrig ] = argv.orig.split(':');
-let orig = { host: hostOrig, port: pOrig || '22' }
-let dest = setDest(argv.dest); // Every destination host into an array
-// console.log(argv.dest, dest);
-// process.exit();
-// [ hostDest, pDest ] = argv.dest.split(':');
-// let dest = { host: hostDest, port: pDest || '22' }
 
-// Set an array with the destination target
+//// Set an array with the destination target
 function setDest(dest) {
   let target = Array.isArray(dest) ? dest : dest.split(" ");
 
@@ -40,13 +37,18 @@ function setDest(dest) {
     .map(host => {
       if ( /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(host) ) {
         const [ ip, port ] = host.split(':');
-        return { host: ip, port: port || '22' }
+        return {
+          host: ip,
+          port: port || '22',
+          state: DOWN,
+
+        }
       }
     })
     .filter(host => host);
 }
 
-// Execute a shell linux command and return its result wrapped in a Promise
+//// Execute a shell linux command and return its result wrapped in a Promise
 function command(sentence, msg) {
   return new Promise(function(resolve, reject) {
     try {
@@ -63,7 +65,7 @@ function command(sentence, msg) {
   });
 }
 
-// It manages a list of Promises executed in parallel
+//// It manages a list of Promises executed in parallel
 function commands(list) {
   return Promise.all(list.reduce((prev, curr) => {
     prev.push(command(curr[0], curr[1]));
@@ -71,7 +73,7 @@ function commands(list) {
   }, []));
 }
 
-// linux commands to be executed
+//// linux commands to be executed
 async function execute() {
   const origTimeLbl = '    Tiempo empleado';
   const noCkech = '-oStrictHostKeyChecking=no'; // to avoid check different host dynIP
@@ -121,6 +123,7 @@ async function execute() {
   }
 }
 
+//// To check a host is available
 function checkHost({host, port}) {
   return new Promise((resolve, reject) => {
     try {
@@ -135,25 +138,35 @@ function checkHost({host, port}) {
 }
 
 function main() {
+  // Looking for SSH ports and host isolation
+  const [ hostOrig, pOrig ] = argv.orig.split(':');
+  let orig = {
+    host:     hostOrig,
+    port:     pOrig || '22',
+    state:    DOWN,
+    channels: NO,
+    icons:    NO
+   }
+  let dest = setDest(argv.dest); // Every destination host into an array
+
   // Clears screen and welcome message
   clear();
   term.blue(figlet.textSync('DEC-UPDATE', { horizontalLayout: 'full' }));
   draw(orig, dest);
 
-  checkHost(orig).then(state => {
-    orig.state = state;
-    // draw(orig, dest)
-  }),
-  dest
-    .map(host => {
+  checkHost(orig).then(() => {
+    orig.state = UP;
+    draw(orig, dest);
+    dest.map(host => {
       checkHost(host)
-        .then(() => 'UP')
-        .catch(() => 'DOWN')
-        .then((state) => {
-          host.state = state;
-          console.log(host) ;
-        });
+      .then(() => UP)
+      .catch(() => DOWN)
+      .then((state) => {
+        host.state = state;
+        // console.log(host);
+      });
     });
+  });
   // .then(() => execute())
   // .catch((err) => {
   //   console.log(err);
@@ -161,17 +174,8 @@ function main() {
   // });
 }
 
+//// It draws on the screen
 function draw(orig, dest) {
-  const COLOR = { YES: 'green', UP: 'green', NO: 'red', DOWN: 'red'};
-  const {origin, targets} = {
-    origin: {
-      host: `${orig.host}:${orig.port}`,
-      state: orig.state || 'DOWN',
-      channels: 'YES',
-      icons: 'NO'
-    },
-    targets: []
-  }
   const outputBuffer = new LineBuffer({
     x: 0,
     y: 7,
@@ -194,10 +198,10 @@ function draw(orig, dest) {
 
   const originHost = new Line(outputBuffer)
     .padding(1)
-    .column(origin.host, 32)
-    .column(origin.state, 16, [clc[COLOR[origin.state]]])
-    .column(origin.channels, 25, [clc[COLOR[origin.channels]]])
-    .column(origin.icons, 3, [clc[COLOR[origin.icons]]])
+    .column(`${orig.host}:${orig.port}`, 32)
+    .column(orig.state[0], 16, [clc[orig.state[1]]])
+    .column(orig.channels[0], 25, [clc[orig.channels[1]]])
+    .column(orig.icons[0], 3, [clc[orig.icons[1]]])
     .fill()
     .store();
   blankLine();
