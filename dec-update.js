@@ -41,7 +41,9 @@ function setDest(dest) {
           host: ip,
           port: port || '22',
           state: DOWN,
-
+          channels: NO,
+          iconsUp: NO,
+          iconsSet: NO
         }
       }
     })
@@ -163,7 +165,7 @@ function main() {
       .catch(() => DOWN)
       .then((state) => {
         host.state = state;
-        // console.log(host);
+        draw(orig, dest);
       });
     });
   });
@@ -186,7 +188,7 @@ function draw(orig, dest) {
     .fill()
     .store();
 
-  const originHeader = new Line(outputBuffer)
+  new Line(outputBuffer)
     .padding(1)
     .column('Origin Host', 30, [clc.magenta])
     .column('UP/DOWN', 10, [clc.magenta])
@@ -196,7 +198,7 @@ function draw(orig, dest) {
     .store();
   blankLine();
 
-  const originHost = new Line(outputBuffer)
+  new Line(outputBuffer)
     .padding(1)
     .column(`${orig.host}:${orig.port}`, 32)
     .column(orig.state[0], 16, [clc[orig.state[1]]])
@@ -207,15 +209,28 @@ function draw(orig, dest) {
   blankLine();
   blankLine();
 
-  const destinationHeader = new Line(outputBuffer)
+  new Line(outputBuffer)
     .padding(1)
     .column('Target IP Host', 30, [clc.magenta])
     .column('UP/DOWN', 10, [clc.magenta])
-    .column('Channel configured', 22, [clc.magenta])
+    .column('Channels configured', 22, [clc.magenta])
     .column('Icons uploaded', 18, [clc.magenta])
     .column('Icons established', 20, [clc.magenta])
     .fill()
     .store();
+  blankLine();
+
+  dest.map(target => {
+    new Line(outputBuffer)
+      .padding(1)
+      .column(`${target.host}:${target.port}`, 32)
+      .column(target.state[0], 16, [clc[target.state[1]]])
+      .column(target.channels[0], 20, [clc[target.channels[1]]])
+      .column(target.iconsUp[0], 18, [clc[target.iconsUp[1]]])
+      .column(target.iconsSet[0], 20, [clc[target.iconsSet[1]]])
+      .fill()
+      .store();
+  })
   blankLine();
 
   outputBuffer.output();
