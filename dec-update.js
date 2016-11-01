@@ -4,21 +4,21 @@
 // global declarations
 const icons       = "picon.tar.bz2",
       origDefault = "192.168.1.204:22",
-      destDefault = "192.168.1.222:22";
+      destDefault = "192.168.1.222:22",
       noCkech     = '-oStrictHostKeyChecking=no'; // to avoid check different host dynIP
 
 // import required libraries
 const exec = require('child_process').exec;
 const argv = require('yargs')
-      .usage('Uso: $0 --orig [ip]:[puerto] --dest [ip]:[puerto] --port [puerto]')
+      .usage('Usage: $0 --orig [ip]:[port] --dest [ip]:[port] --port [port]')
       .default({'orig': origDefault, 'port': '22'})
       .demand(['orig', 'dest'])
       .showHelpOnFail(true)
       .argv;
 const term        = require( 'terminal-kit' ).terminal;
-const portscanner = require('portscanner');
-const clear       = require('clear')
-      figlet      = require('figlet')
+const portscanner = require('portscanner'),
+      clear       = require('clear'),
+      figlet      = require('figlet'),
       CLI         = require('clui'),
       clc         = require('cli-color'),
       Line        = CLI.Line,
@@ -35,21 +35,26 @@ var spin = new Spinner('');
 spin.start();
 
 //// Set an array with the destination target
-function setDest(dest) {
+function setDest(dest, users) {
   let target = Array.isArray(dest) ? dest : dest.split(" ");
 
   return target
     .map(host => {
-      if ( /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(host) ) {
-        const [ ip, port ] = host.split(':');
-        return {
-          host: ip,
-          port: port || argv.port,
-          state: DOWN,
-          channels: NO,
-          iconsUp: NO,
-          iconsSet: NO
-        }
+      let [ ip, port ] = host.split(':'),
+          username = '';
+      if ( !/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(host) ) {
+        // NO IP style target
+        username = ip;
+        ip = users[username];
+      }
+      return {
+        host: ip,
+        port: port || argv.port,
+        state: DOWN,
+        channels: NO,
+        iconsUp: NO,
+        iconsSet: NO,
+        user: username
       }
     })
     .filter(host => host);
@@ -70,12 +75,12 @@ function command(sentence) {
 }
 
 //// It manages a list of Promises executed in parallel
-function commands(list) {
-  return Promise.all(list.reduce((prev, curr) => {
-    prev.push(command(curr[0], curr[1]));
-    return prev;
-  }, []));
-}
+// function commands(list) {
+//   return Promise.all(list.reduce((prev, curr) => {
+//     prev.push(command(curr[0], curr[1]));
+//     return prev;
+//   }, []));
+// }
 
 //// To check a host is available
 function checkHost({host, port}) {
@@ -91,7 +96,26 @@ function checkHost({host, port}) {
   })
 }
 
-function main() {
+//// It reads the users.html page to get each user IP
+async function getUsersIPs(user) {
+  await command(`curl http://192.168.1.204:8181/users.html -O --user ${user}`);
+  const userlines = require('fs').readFileSync('./users.html').toString().match(/<tr>.+<\/tr>/g);
+
+  return userlines.reduce((users, line, i) => {
+    const user = line.match(/<tr><td>-?\d{1,3}<\/td><td>([a-zA-Z0-0]+)<\/td>.+<td>(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})<\/td>.+<\/tr>/);
+    if (user) users[ user[1] ] = user[2];
+    return users;
+  }, {});
+}
+
+async function main() {
+  // It crawls into the users html page taking users/IP if user admin:passwd is supplied
+  let users = {};
+  if (argv.user) {
+    users = await getUsersIPs(argv.user);
+    // console.log(`Usuarios leíos: ${JSON.stringify(users, null, 2)}`);
+  }
+
   // Looking for SSH ports and host isolation
   const [ hostOrig, pOrig ] = argv.orig.split(':');
   let orig = {
@@ -100,8 +124,8 @@ function main() {
     state:    DOWN,
     channels: NO,
     icons:    NO
-   }
-  let dest = setDest(argv.dest); // Every destination host into an array
+  }
+  let dest = setDest(argv.dest, users); // Every destination host into an array
 
   // Clears screen and welcome message
   clear();
@@ -184,7 +208,7 @@ function draw(orig, dest, spinMsg='') {
 
   new Line(outputBuffer)
     .padding(1)
-    .column('Origin Host', 26, [clc.magenta])
+    .column('Origin Host', 25, [clc.magenta])
     .column('Port', 6, [clc.magenta])
     .column('UP/DOWN', 10, [clc.magenta])
     .column('Channel list retrieved', 25, [clc.magenta])
@@ -220,9 +244,10 @@ function draw(orig, dest, spinMsg='') {
     blankLine();
 
     dest.map(target => {
+      const host = target.user? `${target.host} (${target.user})` : target.host;
       new Line(outputBuffer)
       .padding(1)
-      .column(target.host, 26, [clc.blue])
+      .column(host, 26, [clc.blue])
       .column(target.port, 14, [clc.blue])
       .column(target.state[0], 16, [clc[target.state[1]]])
       .column(target.channels[0], 20, [clc[target.channels[1]]])
