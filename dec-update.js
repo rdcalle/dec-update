@@ -47,9 +47,9 @@ function setDest(dest, users) {
         username = ip;
         ip = users[username];
       }
-      return {
+      if (ip) return {
         host: ip,
-        port: port || argv.port,
+        port: port || `${argv.port}`,
         state: DOWN,
         channels: NO,
         iconsUp: NO,
@@ -120,7 +120,7 @@ async function main() {
   const [ hostOrig, pOrig ] = argv.orig.split(':');
   let orig = {
     host:     hostOrig,
-    port:     pOrig || argv.port,
+    port:     pOrig || `${argv.port}`,
     state:    DOWN,
     channels: NO,
     icons:    NO
@@ -148,6 +148,7 @@ async function main() {
   .then(() => {
     orig.icons = YES;
     draw(orig, dest);
+
     // Now, we can do the broadcasting to each target
     return Promise.all(dest.map(target => {
       return new Promise((resolve, reject) => {
@@ -183,8 +184,10 @@ async function main() {
       })
     }));
   })
-  .catch(() => {
-    spin.message(`Aborted process.`);
+  .catch((err) => {
+    spin.stop();
+    term.bold(`\n\Aborted process.\n`);
+    console.log(err);
   })
   .then(() => {
     spin.stop();
@@ -255,7 +258,7 @@ function draw(orig, dest, spinMsg='') {
       .column(target.iconsSet[0], 20, [clc[target.iconsSet[1]]])
       .fill()
       .store();
-    })
+    });
     blankLine();
   }
 
