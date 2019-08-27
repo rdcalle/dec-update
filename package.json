@@ -9,9 +9,16 @@
   "author": "Ricardo Díaz",
   "license": "ISC",
   "dependencies": {
-    "babel": "^6.5.2",
+    "@babel/node": "^7.0.0",
+    "babel-cli": "^6.26.0",
     "babel-plugin-transform-async-to-generator": "^6.8.0",
-    "portscanner": "^1.0.0"
+    "clear": "^0.1.0",
+    "cli-colors": "^0.0.2",
+    "clui": "^0.3.6",
+    "figlet": "^1.2.0",
+    "portscanner": "^1.0.0",
+    "terminal-kit": "^1.26.2",
+    "yargs": "^12.0.1"
   },
   "devDependencies": {
     "babel-preset-es2015": "^6.18.0",
