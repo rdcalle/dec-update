@@ -161,7 +161,7 @@ async function main() {
                 draw(orig, dest, `Uploading channels to ${target.host}`);
                 // Uploading channels list
                 return command(
-                  `scp ${noCkech} -P ${target.port} \`find etc/ | egrep 'lamedb|list|bouquet|satellites'\` root@${target.host}:/etc/enigma2/`
+                  `scp ${noCkech} -P ${target.port} \`find etc/ | egrep 'lamedb|list|bouquet|satellites|.tv|.radio'\` root@${target.host}:/etc/enigma2/`
                 );
               })
               .then(() => {
