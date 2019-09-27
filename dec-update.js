@@ -53,7 +53,6 @@ function setDest(dest, users) {
           state: DOWN,
           channels: NO,
           iconsUp: NO,
-          iconsSet: NO,
           user: username
         };
       }
@@ -136,7 +135,7 @@ async function main() {
       draw(orig, dest, `Retrieving channels from ${orig.host}`);
       // Getting the channel list from the origin host
       return command(
-        `ssh ${noCkech} -p ${orig.port} root@${orig.host} "tar cf - /etc/enigma2" | tar xvf -`
+        `ssh ${noCkech} -p ${orig.port} root@${orig.host} "tar czf - /etc/enigma2" | tar xzf -`
       );
     })
     .then(() => {
@@ -144,7 +143,7 @@ async function main() {
       draw(orig, dest, `Getting the icons pack from ${orig.host}`);
       // Retrieving the icons pack
       return command(
-        `ssh ${noCkech} -p ${orig.port} root@${orig.host} "cd /hdd && tar cf - picon" | bzip2 - > ${icons}`
+        `ssh ${noCkech} -p ${orig.port} root@${orig.host} "cd /hdd && tar czf - picon" | tar xzf -`
       );
     })
     .then(() => {
@@ -154,38 +153,34 @@ async function main() {
       // Now, we can do the broadcasting to each target
       return Promise.all(
         dest.map(target => {
-          return new Promise(resolve => {
+          return new Promise((resolve, reject) => {
             checkHost(target)
-              .then(state => {
+              .then(() => {
                 target.state = UP;
                 draw(orig, dest, `Uploading channels to ${target.host}`);
                 // Uploading channels list
                 return command(
-                  `scp ${noCkech} -P ${target.port} \`find etc/ | egrep 'lamedb|list|bouquet|satellites|.tv|.radio'\` root@${target.host}:/etc/enigma2/`
+                  `tar czf - \`find etc/enigma2/ | egrep 'lamedb|list|bouquet|satellites|.tv|.radio'\` | ssh root@${target.host} -p ${target.port} tar xzf - -C /`
                 );
               })
               .then(() => {
                 target.channels = YES;
-                draw(orig, dest, `Uploading icons pack to ${target.host}`);
+                draw(
+                  orig,
+                  dest,
+                  `Uploading and extracting icons pack to ${target.host}`
+                );
                 // Uploading icons
                 return command(
-                  `scp ${noCkech} -P ${target.port} -r ./${icons} root@${target.host}:`
+                  `tar czf - picon | ssh root@${target.host} -p ${target.port} "rm -rf /usr/share/enigma2/picon/*;tar xzf - -C /usr/share/enigma2/"`
                 );
               })
               .then(() => {
                 target.iconsUp = YES;
-                draw(orig, dest, `Extracting icons into the ${target.host}`);
-                // Extracting icons
-                return command(
-                  `ssh ${noCkech} -p ${target.port} root@${target.host} "tar xjf ${icons} -C /usr/share/enigma2/ && rm -rf ${icons}"`
-                );
-              })
-              .then(() => {
-                target.iconsSet = YES;
                 draw(orig, dest);
                 resolve();
               })
-              .catch(() => resolve());
+              .catch(err => reject(err));
           });
         })
       );
@@ -197,8 +192,8 @@ async function main() {
     })
     .finally(() => {
       spin.stop();
-      term.white(`\n\nErasing temporal files... `);
-      command(`rm -rf ./etc ./${icons}`);
+      term.white(`\n\nErasing temporal folders and files... `);
+      command(`rm -rf ./etc ./picon`);
       term.bold(`Bye!\n\n`);
     });
 }
@@ -245,7 +240,6 @@ function draw(orig, dest, spinMsg = "") {
       .column("UP/DOWN", 10, [clc.magenta])
       .column("Channels configured", 22, [clc.magenta])
       .column("Icons uploaded", 18, [clc.magenta])
-      .column("Icons established", 20, [clc.magenta])
       .fill()
       .store();
     blankLine();
@@ -261,7 +255,6 @@ function draw(orig, dest, spinMsg = "") {
         .column(target.state[0], 16, [clc[target.state[1]]])
         .column(target.channels[0], 20, [clc[target.channels[1]]])
         .column(target.iconsUp[0], 18, [clc[target.iconsUp[1]]])
-        .column(target.iconsSet[0], 20, [clc[target.iconsSet[1]]])
         .fill()
         .store();
     });
