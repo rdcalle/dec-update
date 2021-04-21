@@ -3,7 +3,7 @@
 
 // global declarations
 const icons = "picon.tar.bz2",
-  origDefault = "192.168.1.204:22",
+  origDefault = "10.244.0.1:22",
   destDefault = "192.168.1.222:22",
   noCkech = "-oStrictHostKeyChecking=no"; // to avoid check different host dynIP
 
